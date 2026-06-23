@@ -80,7 +80,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'TAJAMAR TV+',
+          'YouTVPlay',
           style: GoogleFonts.outfit(
             fontWeight: FontWeight.bold,
             letterSpacing: -0.5,
@@ -134,7 +134,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      'Inicia sesión como administrador (admin@tajamar.tv) para añadir canales desde el panel de gestión.',
+                      'Inicia sesión como administrador (admin@youtvplay.com) para añadir canales desde el panel de gestión.',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: AppColors.textSecondary),
                     ),

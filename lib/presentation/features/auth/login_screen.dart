@@ -22,7 +22,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     await Future.delayed(const Duration(seconds: 2));
     
     // Mock login logic
-    if (_emailController.text == 'admin@tajamar.tv') {
+    if (_emailController.text == 'admin@youtvplay.com') {
       ref.read(userRoleProvider.notifier).state = 'admin';
     } else {
       ref.read(userRoleProvider.notifier).state = 'client';
@@ -54,7 +54,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'TAJAMAR TV+',
+                      'YouTVPlay',
                       style: GoogleFonts.outfit(
                         fontSize: 32,
                         fontWeight: FontWeight.bold,

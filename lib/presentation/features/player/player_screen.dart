@@ -562,7 +562,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
               child: const Opacity(
                 opacity: 0.5,
                 child: Text(
-                  'TAJAMAR TV+',
+                  'YouTVPlay',
                   style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,

@@ -22,7 +22,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'TAJAMAR TV+ | ADMIN',
+          'YouTVPlay | ADMIN',
           style: GoogleFonts.outfit(
             fontWeight: FontWeight.bold,
             color: AppColors.secondary,
