@@ -132,7 +132,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         channel.url.contains('youtu.be');
 
     setState(() {
-      _isMuted = true;
       _currentChannel = channel;
       _hasError = false;
       _errorMessage = '';
@@ -185,13 +184,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         _preloadedControllers.remove(channel.id); // Active, remove from cache list
         
         if (_controller!.value.isInitialized) {
+          _controller!.setVolume(_isMuted ? 0.0 : _volumePercent / 100.0);
           _controller!.play();
           setState(() {});
         } else {
           // If in the middle of initializing, wait and play
           _controller!.initialize().then((_) {
             if (mounted && _currentChannel.id == channel.id) {
-              _controller?.setVolume(0.0);
+              _controller?.setVolume(_isMuted ? 0.0 : _volumePercent / 100.0);
               _controller?.play();
               setState(() {});
             }
@@ -309,6 +309,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           _ytController?.playVideo();
         }
       }
+      // If we are not muted, make sure YouTube player is unmuted once it starts playing
+      if (value.playerState == PlayerState.playing && !_isMuted) {
+        _ytController?.unMute();
+        _ytController?.setVolume(_volumePercent);
+      }
     });
     
     // Initial play request
@@ -343,7 +348,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     _controller = VideoPlayerController.networkUrl(uri)
       ..initialize().then((_) {
         if (mounted) {
-          _controller?.setVolume(0.0); // Start muted to guarantee autoplay works on web zapping
+          _controller?.setVolume(_isMuted ? 0.0 : _volumePercent / 100.0); // Respect mute state
           setState(() {});
           _controller?.play(); // Autoplay
         }
