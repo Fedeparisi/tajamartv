@@ -46,6 +46,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   final Map<String, VideoPlayerController> _preloadedControllers = {};
   bool _isFullscreen = false;
 
+  bool _isHoveringLeftArrow = false;
+  bool _isHoveringRightArrow = false;
+
   @override
   void initState() {
     super.initState();
@@ -163,7 +166,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
       // Always recreate YouTube Controller when switching to guarantee autoplay on web
       if (_ytController != null) {
-        _ytController!.close();
+        _ytController!.close().catchError((e) {});
         _ytController = null;
       }
       _controller?.dispose();
@@ -172,7 +175,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     } else {
       // Clean up YouTube player if zapping to normal channel
       if (_ytController != null) {
-        _ytController!.close();
+        _ytController!.close().catchError((e) {});
         _ytController = null;
       }
       
@@ -386,7 +389,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     HardwareKeyboard.instance.removeHandler(_handleGlobalKey);
     _focusNode.dispose();
     _controller?.dispose();
-    _ytController?.close();
+    _ytController?.close().catchError((e) {});
     _zapHUDTimer?.cancel();
     
     // Dispose preloaded controllers to prevent memory leaks
@@ -673,24 +676,31 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
               child: Center(
                 child: MouseRegion(
                   cursor: SystemMouseCursors.click,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.black45,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white12),
-                    ),
-                    child: IconButton(
-                      icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 24),
-                      onPressed: () {
-                        _focusNode.requestFocus();
-                        _previousChannel();
-                      },
+                  onEnter: (_) => setState(() => _isHoveringLeftArrow = true),
+                  onExit: (_) => setState(() => _isHoveringLeftArrow = false),
+                  child: AnimatedRotation(
+                    turns: _isHoveringLeftArrow ? -1.0 : 0.0,
+                    duration: const Duration(milliseconds: 500),
+                    curve: Curves.easeInOut,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.black45,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white12),
+                      ),
+                      child: IconButton(
+                        icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 24),
+                        onPressed: () {
+                          _focusNode.requestFocus();
+                          _previousChannel();
+                        },
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-
+ 
             // Right Navigation Arrow (Next Channel)
             Positioned(
               right: 20,
@@ -699,18 +709,25 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
               child: Center(
                 child: MouseRegion(
                   cursor: SystemMouseCursors.click,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.black45,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white12),
-                    ),
-                    child: IconButton(
-                      icon: const Icon(Icons.arrow_forward_ios, color: Colors.white, size: 24),
-                      onPressed: () {
-                        _focusNode.requestFocus();
-                        _nextChannel();
-                      },
+                  onEnter: (_) => setState(() => _isHoveringRightArrow = true),
+                  onExit: (_) => setState(() => _isHoveringRightArrow = false),
+                  child: AnimatedRotation(
+                    turns: _isHoveringRightArrow ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 500),
+                    curve: Curves.easeInOut,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.black45,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white12),
+                      ),
+                      child: IconButton(
+                        icon: const Icon(Icons.arrow_forward_ios, color: Colors.white, size: 24),
+                        onPressed: () {
+                          _focusNode.requestFocus();
+                          _nextChannel();
+                        },
+                      ),
                     ),
                   ),
                 ),
