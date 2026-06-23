@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../domain/entities/channel_entity.dart';
 import '../../../core/constants/app_colors.dart';
 import '../player/player_screen.dart';
+import '../admin/providers/channel_admin_provider.dart';
 
 class ChannelsScreen extends ConsumerStatefulWidget {
   const ChannelsScreen({super.key});
@@ -13,86 +14,124 @@ class ChannelsScreen extends ConsumerStatefulWidget {
 }
 
 class _ChannelsScreenState extends ConsumerState<ChannelsScreen> {
-  // Mock data para UI inicial
-  final List<ChannelEntity> mockChannels = List.generate(
-    20,
-    (index) => ChannelEntity(
-      id: index.toString(),
-      companyId: 'company_tajamar',
-      name: 'Canal HD ${index + 1}',
-      logo: 'https://images.unsplash.com/photo-1616469829581-73993eb86b02?q=80&w=2070&auto=format&fit=crop',
-      categoryId: index % 3 == 0 ? 'Deportes' : 'General',
-      url: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8', // Stream de prueba estándar
-      streamType: 'hls',
-      language: 'es',
-      country: 'AR',
-      epgId: 'tvg_123',
-    ),
-  );
-
   String selectedCategory = 'Todos';
-  final List<String> categories = ['Todos', 'Deportes', 'Cine', 'Noticias', 'Infantil'];
+
+  String _getProxiedImageUrl(String url) {
+    if (url.isEmpty) {
+      return 'https://images.unsplash.com/photo-1616469829581-73993eb86b02?q=80&w=200';
+    }
+    if (url.startsWith('http')) {
+      final cleanUrl = url.replaceFirst(RegExp(r'https?://'), '');
+      return 'https://images.weserv.nl/?url=$cleanUrl';
+    }
+    return url;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final channelsAsync = ref.watch(channelsStreamProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: Text(
           'TV en Vivo',
           style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
         ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(50),
-          child: SizedBox(
-            height: 50,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: categories.length,
-              itemBuilder: (context, index) {
-                final category = categories[index];
-                final isSelected = selectedCategory == category;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8.0),
-                  child: FilterChip(
-                    label: Text(category),
-                    selected: isSelected,
-                    onSelected: (selected) {
-                      setState(() => selectedCategory = category);
-                    },
-                    selectedColor: AppColors.primary,
-                    checkmarkColor: AppColors.textPrimary,
-                    backgroundColor: AppColors.panel,
-                  ),
-                );
-              },
-            ),
-          ),
-        ),
       ),
-      body: GridView.builder(
-        padding: const EdgeInsets.all(16),
-        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-          maxCrossAxisExtent: 200,
-          childAspectRatio: 16 / 9,
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-        ),
-        itemCount: mockChannels.length,
-        itemBuilder: (context, index) {
-          final channel = mockChannels[index];
-          return _buildChannelCard(channel);
+      body: channelsAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (err, stack) => Center(child: Text('Error: $err')),
+        data: (channels) {
+          if (channels.isEmpty) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.tv_off, size: 64, color: AppColors.textSecondary),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No hay canales guardados.',
+                      style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Agrega canales desde el panel de administración.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          final categories = ['Todos', ...channels.map((c) => c.categoryId).toSet()];
+          final filteredChannels = selectedCategory == 'Todos'
+              ? channels
+              : channels.where((c) => c.categoryId == selectedCategory).toList();
+
+          return Column(
+            children: [
+              SizedBox(
+                height: 50,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: categories.length,
+                  itemBuilder: (context, index) {
+                    final category = categories[index];
+                    final isSelected = selectedCategory == category;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8.0),
+                      child: FilterChip(
+                        label: Text(category),
+                        selected: isSelected,
+                        onSelected: (selected) {
+                          setState(() => selectedCategory = category);
+                        },
+                        selectedColor: AppColors.primary,
+                        checkmarkColor: AppColors.textPrimary,
+                        backgroundColor: AppColors.panel,
+                      ),
+                    );
+                  },
+                ),
+              ),
+              Expanded(
+                child: GridView.builder(
+                  padding: const EdgeInsets.all(16),
+                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: 200,
+                    childAspectRatio: 16 / 9,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                  ),
+                  itemCount: filteredChannels.length,
+                  itemBuilder: (context, index) {
+                    final channel = filteredChannels[index];
+                    return _buildChannelCard(channel, channels);
+                  },
+                ),
+              ),
+            ],
+          );
         },
       ),
     );
   }
 
-  Widget _buildChannelCard(ChannelEntity channel) {
+  Widget _buildChannelCard(ChannelEntity channel, List<ChannelEntity> allChannels) {
     return InkWell(
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (context) => PlayerScreen(channel: channel),
+            builder: (context) => PlayerScreen(
+              channel: channel,
+              channels: allChannels,
+            ),
           ),
         );
       },
@@ -102,9 +141,10 @@ class _ChannelsScreenState extends ConsumerState<ChannelsScreen> {
           color: AppColors.panel,
           borderRadius: BorderRadius.circular(12),
           image: DecorationImage(
-            image: NetworkImage(channel.logo),
+            image: NetworkImage(_getProxiedImageUrl(channel.logo)),
             fit: BoxFit.cover,
             colorFilter: ColorFilter.mode(Colors.black.withOpacity(0.6), BlendMode.darken),
+            onError: (e, s) {},
           ),
         ),
         child: Stack(
