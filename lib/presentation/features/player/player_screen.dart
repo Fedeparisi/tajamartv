@@ -317,6 +317,27 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     setState(() {});
   }
 
+  void _unmute() {
+    _focusNode.requestFocus();
+    if (_isYoutube) {
+      if (_ytController != null) {
+        _ytController!.unMute();
+        _ytController!.setVolume(_volumePercent);
+        _ytController!.playVideo();
+      }
+    } else {
+      _controller?.setVolume(_volumePercent / 100.0);
+    }
+    setState(() {
+      _isMuted = false;
+      _showZapHUD = true;
+    });
+    _zapHUDTimer?.cancel();
+    _zapHUDTimer = Timer(const Duration(milliseconds: 2000), () {
+      if (mounted) setState(() => _showZapHUD = false);
+    });
+  }
+
   void _initializePlayer(String url) {
     final uri = Uri.parse(url);
     _controller = VideoPlayerController.networkUrl(uri)
@@ -427,22 +448,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                                 Positioned.fill(
                                   child: GestureDetector(
                                     behavior: HitTestBehavior.opaque,
-                                    onTap: () {
-                                      _focusNode.requestFocus(); // Reclaim keyboard focus
-                                      if (_ytController != null) {
-                                        _ytController!.unMute();
-                                        _ytController!.setVolume(_volumePercent);
-                                        _ytController!.playVideo(); // Enforce play if blocked
-                                        setState(() {
-                                          _isMuted = false;
-                                          _showZapHUD = true;
-                                        });
-                                        _zapHUDTimer?.cancel();
-                                        _zapHUDTimer = Timer(const Duration(milliseconds: 2000), () {
-                                          if (mounted) setState(() => _showZapHUD = false);
-                                        });
-                                      }
-                                    },
+                                    onTap: _unmute,
                                     child: const SizedBox.expand(),
                                   ),
                                 ),
@@ -465,23 +471,26 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                 left: 0,
                 right: 0,
                 child: Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.black87,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.white24),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.volume_off, color: Colors.white, size: 20),
-                        SizedBox(width: 8),
-                        Text(
-                          'Haz clic para activar el sonido',
-                          style: TextStyle(color: Colors.white, fontSize: 14),
-                        ),
-                      ],
+                  child: GestureDetector(
+                    onTap: _unmute,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.black87,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.white24),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.volume_off, color: Colors.white, size: 20),
+                          SizedBox(width: 8),
+                          Text(
+                            'Haz clic para activar el sonido',
+                            style: TextStyle(color: Colors.white, fontSize: 14),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -494,15 +503,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                    onTap: () {
                      _focusNode.requestFocus(); // Reclaim keyboard focus
                      if (_isMuted) {
-                       _controller?.setVolume(_volumePercent / 100.0);
-                       setState(() {
-                         _isMuted = false;
-                         _showZapHUD = true;
-                       });
-                       _zapHUDTimer?.cancel();
-                       _zapHUDTimer = Timer(const Duration(milliseconds: 2000), () {
-                         if (mounted) setState(() => _showZapHUD = false);
-                       });
+                       _unmute();
                      } else {
                        setState(() {
                          if (_controller!.value.isPlaying) {
