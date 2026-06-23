@@ -31,6 +31,12 @@
 
   <title>tajamar_tv_plus</title>
   <link rel="manifest" href="manifest.json">
+  <style>
+    /* Prevent native YouTube iframe from intercepting pointer events in Flutter Web */
+    flt-platform-view iframe {
+      pointer-events: none !important;
+    }
+  </style>
 </head>
 <body>
   <!--

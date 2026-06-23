@@ -39,14 +39,17 @@ service cloud.firestore {
 
     // Colección: channels
     match /channels/{channelId} {
-      allow read: if isAuthenticated();
-      allow write: if isSuperAdmin() || isCompanyAdmin(resource.data.companyId);
+      allow read, write: if true;
+    }
+
+    // Colección: profiles
+    match /profiles/{profileId} {
+      allow read, write: if true;
     }
 
     // Colección: categories
     match /categories/{categoryId} {
-      allow read: if isAuthenticated();
-      allow write: if isSuperAdmin() || isCompanyAdmin(resource.data.companyId);
+      allow read, write: if true;
     }
 
     // Favoritos por usuario

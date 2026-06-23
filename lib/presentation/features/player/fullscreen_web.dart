@@ -20,3 +20,9 @@ void exitFullScreen() {
     // Browser might prevent it
   }
 }
+
+void registerFullscreenListener(void Function(bool) onChange) {
+  html.document.onFullscreenChange.listen((event) {
+    onChange(html.document.fullscreenElement != null);
+  });
+}

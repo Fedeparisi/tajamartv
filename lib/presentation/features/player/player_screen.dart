@@ -54,6 +54,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     // Register global keyboard listener to capture keys before they get intercepted
     HardwareKeyboard.instance.addHandler(_handleGlobalKey);
     
+    // Register listener for native browser fullscreen changes
+    registerFullscreenListener((isFullscreen) {
+      if (mounted) {
+        setState(() {
+          _isFullscreen = isFullscreen;
+        });
+      }
+    });
+
     _loadChannel(_currentChannel);
     _preloadAdjacentChannels();
 

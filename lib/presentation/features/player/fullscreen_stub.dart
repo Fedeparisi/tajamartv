@@ -14,3 +14,7 @@ void exitFullScreen() {
     DeviceOrientation.portraitUp,
   ]);
 }
+
+void registerFullscreenListener(void Function(bool) onChange) {
+  // No-op on non-web platforms
+}
