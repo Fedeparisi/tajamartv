@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1055896186316",
+    "project_id": "youtvplay-ae0f7",
+    "storage_bucket": "youtvplay-ae0f7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1055896186316:android:d3eccf3e6021fb12634169",
+        "android_client_info": {
+          "package_name": "com.example.tajamar_tv_plus"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCGzCsIHTKSNCzHW--hdi9aXrH7hgqRZXs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

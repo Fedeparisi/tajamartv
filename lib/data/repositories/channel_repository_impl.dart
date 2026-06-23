@@ -1,32 +1,31 @@
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../domain/entities/channel_entity.dart';
 import '../../domain/repositories/channel_repository.dart';
 import '../models/channel_model.dart';
 
 class ChannelRepositoryImpl implements ChannelRepository {
-  final Box _box = Hive.box('channels_box');
-
-  List<ChannelEntity> _getChannelsList() {
-    final list = _box.values.map<ChannelEntity>((item) {
-      final map = Map<String, dynamic>.from(item as Map);
-      final id = map['id'] as String? ?? '';
-      return ChannelModel.fromJson(map, id);
-    }).toList();
-    list.sort((a, b) => a.order.compareTo(b.order));
-    return list;
-  }
+  final _db = FirebaseFirestore.instance;
 
   @override
-  Stream<List<ChannelEntity>> getChannels() async* {
-    yield _getChannelsList();
-    await for (final _ in _box.watch()) {
-      yield _getChannelsList();
-    }
+  Stream<List<ChannelEntity>> getChannels() {
+    return _db
+        .collection('channels')
+        .snapshots()
+        .map((snapshot) {
+      final list = snapshot.docs.map<ChannelEntity>((doc) {
+        final map = doc.data();
+        final id = doc.id;
+        return ChannelModel.fromJson(map, id);
+      }).toList();
+      list.sort((a, b) => a.order.compareTo(b.order));
+      return list;
+    });
   }
 
   @override
   Future<void> addChannel(ChannelEntity channel) async {
-    final id = DateTime.now().millisecondsSinceEpoch.toString();
+    final ref = _db.collection('channels').doc();
+    final id = ref.id;
     final model = ChannelModel(
       id: id,
       companyId: channel.companyId,
@@ -45,7 +44,7 @@ class ChannelRepositoryImpl implements ChannelRepository {
     );
     final map = model.toJson();
     map['id'] = id;
-    await _box.put(id, map);
+    await ref.set(map);
   }
 
   @override
@@ -68,11 +67,11 @@ class ChannelRepositoryImpl implements ChannelRepository {
     );
     final map = model.toJson();
     map['id'] = channel.id;
-    await _box.put(channel.id, map);
+    await _db.collection('channels').doc(channel.id).set(map);
   }
 
   @override
   Future<void> deleteChannel(String id) async {
-    await _box.delete(id);
+    await _db.collection('channels').doc(id).delete();
   }
 }
