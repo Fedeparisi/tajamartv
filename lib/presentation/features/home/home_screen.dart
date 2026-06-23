@@ -89,6 +89,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 pointerEvents: PointerEvents.none,
               ),
             )..stream.listen((value) {
+                if (value.playerState == PlayerState.cued) {
+                  _ytController?.playVideo();
+                }
                 if (value.playerState == PlayerState.playing && mounted) {
                   setState(() {
                     _isVideoInitialized = true;
@@ -96,6 +99,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 }
               });
           });
+          _ytController?.playVideo();
         }
       } else {
         if (channel.url.isNotEmpty) {
