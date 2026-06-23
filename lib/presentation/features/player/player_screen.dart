@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import '../../../domain/entities/channel_entity.dart';
 import '../../../core/constants/app_colors.dart';
+import 'fullscreen_utils.dart';
 
 class PlayerScreen extends ConsumerStatefulWidget {
   final ChannelEntity channel;
@@ -43,6 +44,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   // Cache for preloaded adjacent channel controllers
   final Map<String, VideoPlayerController> _preloadedControllers = {};
+  bool _isFullscreen = false;
 
   @override
   void initState() {
@@ -343,6 +345,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   @override
   void dispose() {
+    if (_isFullscreen) {
+      exitFullScreen();
+    }
     HardwareKeyboard.instance.removeHandler(_handleGlobalKey);
     _focusNode.dispose();
     _controller?.dispose();
@@ -692,6 +697,41 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                         _nextChannel();
                       },
                     ),
+                  ),
+                ),
+              ),
+            ),
+
+            // Fullscreen Button (Bottom Right)
+            Positioned(
+              bottom: 16,
+              right: 16,
+              child: MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white12),
+                  ),
+                  child: IconButton(
+                    icon: Icon(
+                      _isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                    onPressed: () {
+                      _focusNode.requestFocus();
+                      setState(() {
+                        if (_isFullscreen) {
+                          exitFullScreen();
+                          _isFullscreen = false;
+                        } else {
+                          enterFullScreen();
+                          _isFullscreen = true;
+                        }
+                      });
+                    },
                   ),
                 ),
               ),
