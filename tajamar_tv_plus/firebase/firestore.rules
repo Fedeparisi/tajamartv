@@ -1,0 +1,73 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Funciones Helper
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isSuperAdmin() {
+      return isAuthenticated() && getUserData().role == 'super_admin';
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && getUserData().role == 'admin';
+    }
+
+    function isCompanyAdmin(companyId) {
+      return isAdmin() && getUserData().companyId == companyId;
+    }
+
+    // Colección: companies
+    match /companies/{companyId} {
+      allow read: if true; // Públicas para el dominio/login
+      allow write: if isSuperAdmin();
+    }
+
+    // Colección: users
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow write: if isSuperAdmin() || (isAdmin() && getUserData().companyId == request.resource.data.companyId);
+      allow update: if request.auth.uid == userId && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'companyId', 'subscriptionId']);
+    }
+
+    // Colección: channels
+    match /channels/{channelId} {
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin() || isCompanyAdmin(resource.data.companyId);
+    }
+
+    // Colección: categories
+    match /categories/{categoryId} {
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin() || isCompanyAdmin(resource.data.companyId);
+    }
+
+    // Favoritos por usuario
+    match /favorites/{userId}/items/{itemId} {
+      allow read, write: if request.auth.uid == userId;
+    }
+
+    // Historial por usuario
+    match /history/{userId}/entries/{entryId} {
+      allow read, write: if request.auth.uid == userId;
+    }
+
+    // Suscripciones y Pagos (Solo lectura para clientes)
+    match /subscriptions/{subscriptionId} {
+      allow read: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow write: if isAdmin();
+    }
+    
+    match /payments/{paymentId} {
+      allow read: if isAuthenticated() && request.auth.uid == resource.data.userId;
+      allow write: if isAdmin();
+    }
+  }
+}
