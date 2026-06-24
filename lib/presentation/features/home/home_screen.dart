@@ -23,6 +23,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _initializedDefault = false;
   Timer? _hoverTimer;
 
+  // Search state
+  bool _isSearching = false;
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
+
   // Video Preview Controllers
   VideoPlayerController? _videoController;
   YoutubePlayerController? _ytController;
@@ -38,6 +43,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     _ytController?.close().catchError((e) {
       // ignore
     });
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -181,35 +187,70 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          'YouTVPlay',
-          style: GoogleFonts.outfit(
-            fontWeight: FontWeight.bold,
-            letterSpacing: -0.5,
-          ),
-        ),
+        title: _isSearching
+            ? TextField(
+                controller: _searchController,
+                autofocus: true,
+                style: const TextStyle(color: Colors.white, fontSize: 18),
+                decoration: const InputDecoration(
+                  hintText: 'Buscar canales...',
+                  hintStyle: TextStyle(color: Colors.white54),
+                  border: InputBorder.none,
+                ),
+                onChanged: (val) {
+                  setState(() {
+                    _searchQuery = val;
+                  });
+                },
+              )
+            : Text(
+                'YouTVPlay',
+                style: GoogleFonts.outfit(
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: -0.5,
+                ),
+              ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () {},
-          ),
-          if (ref.watch(userRoleProvider) == 'admin' || ref.watch(userRoleProvider) == 'super_admin')
+          if (_isSearching)
             IconButton(
-              icon: const Icon(Icons.admin_panel_settings, color: AppColors.secondary),
-              tooltip: 'Panel de Admin',
-              onPressed: () => context.go('/admin'),
+              icon: const Icon(Icons.close),
+              tooltip: 'Cerrar búsqueda',
+              onPressed: () {
+                setState(() {
+                  _searchController.clear();
+                  _searchQuery = '';
+                  _isSearching = false;
+                });
+              },
+            )
+          else ...[
+            IconButton(
+              icon: const Icon(Icons.search),
+              tooltip: 'Buscar',
+              onPressed: () {
+                setState(() {
+                  _isSearching = true;
+                });
+              },
             ),
-          IconButton(
-            icon: const Icon(Icons.person_outline),
-            tooltip: 'Cambiar de Perfil',
-            onPressed: () => context.go('/profiles'),
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () {
-              ref.read(authStateProvider.notifier).state = false;
-            },
-          ),
+            if (ref.watch(userRoleProvider) == 'admin' || ref.watch(userRoleProvider) == 'super_admin')
+              IconButton(
+                icon: const Icon(Icons.admin_panel_settings, color: AppColors.secondary),
+                tooltip: 'Panel de Admin',
+                onPressed: () => context.go('/admin'),
+              ),
+            IconButton(
+              icon: const Icon(Icons.person_outline),
+              tooltip: 'Cambiar de Perfil',
+              onPressed: () => context.go('/profiles'),
+            ),
+            IconButton(
+              icon: const Icon(Icons.logout),
+              onPressed: () {
+                ref.read(authStateProvider.notifier).state = false;
+              },
+            ),
+          ],
         ],
       ),
       body: channelsAsync.when(
@@ -249,9 +290,52 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
           final safeChannels = List<ChannelEntity>.from(channels);
 
-          final featuredChannel = safeChannels.firstWhere(
+          // Apply real-time search filtering
+          final filteredChannels = safeChannels.where((c) {
+            final query = _searchQuery.toLowerCase();
+            return c.name.toLowerCase().contains(query) ||
+                c.categoryId.toLowerCase().contains(query);
+          }).toList();
+
+          if (filteredChannels.isEmpty) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.search_off, size: 64, color: AppColors.textSecondary),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No se encontraron resultados para "$_searchQuery"',
+                      style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Prueba con otra palabra o categoría.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppColors.textSecondary),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () {
+                        setState(() {
+                          _searchController.clear();
+                          _searchQuery = '';
+                        });
+                      },
+                      child: const Text('Limpiar búsqueda'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          final featuredChannel = filteredChannels.firstWhere(
             (c) => c.featured,
-            orElse: () => safeChannels.first,
+            orElse: () => filteredChannels.first,
           );
 
           if (!_initializedDefault) {
@@ -260,8 +344,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             _initializePreviewVideo(featuredChannel);
           }
 
-          final activeChannel = _previewChannel ?? featuredChannel;
-          final categories = safeChannels.map((c) => c.categoryId).toSet().toList();
+          final activeChannel = filteredChannels.contains(_previewChannel)
+              ? (_previewChannel ?? featuredChannel)
+              : featuredChannel;
+          final categories = filteredChannels.map((c) => c.categoryId).toSet().toList();
 
           return ListView(
             children: [
@@ -453,8 +539,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               for (final cat in categories)
                 CategoryCarousel(
                   title: cat,
-                  channels: safeChannels.where((c) => c.categoryId == cat).toList(),
-                  allChannels: safeChannels,
+                  channels: filteredChannels.where((c) => c.categoryId == cat).toList(),
+                  allChannels: filteredChannels,
                   onHoverChannel: _startPreviewDelay,
                 ),
             ],
