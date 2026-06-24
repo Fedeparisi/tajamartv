@@ -6,6 +6,7 @@ import '../../presentation/features/auth/login_screen.dart';
 import '../../presentation/features/home/home_screen.dart';
 import '../../presentation/features/admin/admin_dashboard_screen.dart';
 import '../../presentation/features/profiles/profiles_screen.dart';
+import '../../presentation/features/multiview/multiview_screen.dart';
 
 final authStateProvider = StateProvider<bool>((ref) => false);
 final userRoleProvider = StateProvider<String>((ref) => 'client'); // client, admin, super_admin
@@ -57,6 +58,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/admin',
         name: 'admin',
         builder: (context, state) => const AdminDashboardScreen(),
+      ),
+      GoRoute(
+        path: '/multiview/:count',
+        name: 'multiview',
+        builder: (context, state) {
+          final countStr = state.pathParameters['count'] ?? '4';
+          final count = int.tryParse(countStr) ?? 4;
+          return MultiViewScreen(gridCount: count);
+        },
       ),
     ],
   );

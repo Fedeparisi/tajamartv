@@ -224,6 +224,85 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               },
             )
           else ...[
+            PopupMenuButton<int>(
+              icon: const Icon(Icons.grid_view),
+              tooltip: 'Mosaico Multi-Pantalla',
+              onSelected: (count) {
+                context.go('/multiview/$count');
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem<int>(
+                  value: 4,
+                  child: Row(
+                    children: [
+                      Icon(Icons.grid_on, size: 18),
+                      SizedBox(width: 8),
+                      Text('Mosaico de 4 canales'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem<int>(
+                  value: 6,
+                  child: Row(
+                    children: [
+                      Icon(Icons.grid_on, size: 18),
+                      SizedBox(width: 8),
+                      Text('Mosaico de 6 canales'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem<int>(
+                  value: 8,
+                  child: Row(
+                    children: [
+                      Icon(Icons.grid_on, size: 18),
+                      SizedBox(width: 8),
+                      Text('Mosaico de 8 canales'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem<int>(
+                  value: 10,
+                  child: Row(
+                    children: [
+                      Icon(Icons.grid_on, size: 18),
+                      SizedBox(width: 8),
+                      Text('Mosaico de 10 canales'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem<int>(
+                  value: 12,
+                  child: Row(
+                    children: [
+                      Icon(Icons.grid_on, size: 18),
+                      SizedBox(width: 8),
+                      Text('Mosaico de 12 canales'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem<int>(
+                  value: 14,
+                  child: Row(
+                    children: [
+                      Icon(Icons.grid_on, size: 18),
+                      SizedBox(width: 8),
+                      Text('Mosaico de 14 canales'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem<int>(
+                  value: 16,
+                  child: Row(
+                    children: [
+                      Icon(Icons.grid_on, size: 18),
+                      SizedBox(width: 8),
+                      Text('Mosaico de 16 canales'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
             IconButton(
               icon: const Icon(Icons.search),
               tooltip: 'Buscar',
