@@ -201,7 +201,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
           IconButton(
             icon: const Icon(Icons.person_outline),
-            onPressed: () {},
+            tooltip: 'Cambiar de Perfil',
+            onPressed: () => context.go('/profiles'),
           ),
           IconButton(
             icon: const Icon(Icons.logout),
