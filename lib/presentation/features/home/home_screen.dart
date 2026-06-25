@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 import 'package:video_player/video_player.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
+import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt_explode;
 import '../../../app/router/app_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../domain/entities/channel_entity.dart';
@@ -69,8 +72,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       final isYoutube = channel.streamType.toLowerCase() == 'youtube' ||
           channel.url.contains('youtube.com') ||
           channel.url.contains('youtu.be');
+      
+      final playAsNativeYoutube = isYoutube && !kIsWeb && Platform.isWindows;
 
-      if (isYoutube) {
+      if (isYoutube && !playAsNativeYoutube) {
         final regExp = RegExp(
           r'^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*',
           caseSensitive: false,
@@ -97,6 +102,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 mute: true,
                 enableKeyboard: false,
                 pointerEvents: PointerEvents.none,
+                origin: 'https://www.youtube-nocookie.com',
               ),
             )..stream.listen((value) {
                 if (value.playerState == PlayerState.cued) {
@@ -112,26 +118,73 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           _ytController?.playVideo();
         }
       } else {
-        if (channel.url.isNotEmpty) {
-          final controller = VideoPlayerController.networkUrl(Uri.parse(channel.url));
-          _videoController = controller;
-          controller.initialize().then((_) {
-            if (mounted && _previewChannel?.id == channel.id) {
-              controller.setVolume(0.0);
-              controller.setLooping(true);
-              controller.play();
-              setState(() {
-                _isVideoInitialized = true;
-              });
-            } else {
-              controller.dispose();
+        if (playAsNativeYoutube) {
+          final regExp = RegExp(
+            r'^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*',
+            caseSensitive: false,
+          );
+          final match = regExp.firstMatch(channel.url);
+          String? videoId;
+          if (match != null && match.groupCount >= 2) {
+            final id = match.group(2);
+            if (id != null && id.length == 11) {
+              videoId = id;
             }
-          }).catchError((_) {
-            // Ignore init errors for preview
-          });
+          }
+          if (videoId != null) {
+            if (!mounted || _previewChannel?.id != channel.id) return;
+            _initializeYoutubePreviewWindows(videoId, channel.id);
+          }
+        } else {
+          if (channel.url.isNotEmpty) {
+            final controller = VideoPlayerController.networkUrl(Uri.parse(channel.url));
+            controller.initialize().then((_) {
+              if (mounted && _previewChannel?.id == channel.id) {
+                _videoController?.dispose();
+                _videoController = controller;
+                controller.setVolume(0.0);
+                controller.setLooping(true);
+                controller.play();
+                setState(() {
+                  _isVideoInitialized = true;
+                });
+              } else {
+                controller.dispose();
+              }
+            }).catchError((_) {
+              // Ignore init errors for preview
+            });
+          }
         }
       }
     });
+  }
+
+  Future<void> _initializeYoutubePreviewWindows(String videoId, String channelId) async {
+    try {
+      final yt = yt_explode.YoutubeExplode();
+      final manifest = await yt.videos.streamsClient.getManifest(videoId);
+      final streamInfo = manifest.muxed.withHighestBitrate();
+      final streamUrl = streamInfo.url.toString();
+      yt.close();
+
+      if (!mounted || _previewChannel?.id != channelId) return;
+
+      final controller = VideoPlayerController.networkUrl(Uri.parse(streamUrl));
+      await controller.initialize();
+      if (mounted && _previewChannel?.id == channelId) {
+        _videoController?.dispose();
+        _videoController = controller;
+        controller.setVolume(0.0);
+        controller.setLooping(true);
+        controller.play();
+        setState(() {
+          _isVideoInitialized = true;
+        });
+      } else {
+        controller.dispose();
+      }
+    } catch (_) {}
   }
 
   void _startPreviewDelay(ChannelEntity channel) {
@@ -879,8 +932,10 @@ class _HoverableChannelCardState extends State<HoverableChannelCard> {
       final isYoutube = widget.channel.streamType.toLowerCase() == 'youtube' ||
           widget.channel.url.contains('youtube.com') ||
           widget.channel.url.contains('youtu.be');
+      
+      final playAsNativeYoutube = isYoutube && !kIsWeb && Platform.isWindows;
 
-      if (isYoutube) {
+      if (isYoutube && !playAsNativeYoutube) {
         final regExp = RegExp(
           r'^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*',
           caseSensitive: false,
@@ -907,6 +962,7 @@ class _HoverableChannelCardState extends State<HoverableChannelCard> {
                 mute: true,
                 enableKeyboard: false,
                 pointerEvents: PointerEvents.none,
+                origin: 'https://www.youtube-nocookie.com',
               ),
             )..stream.listen((value) {
                 if (value.playerState == PlayerState.cued) {
@@ -922,27 +978,75 @@ class _HoverableChannelCardState extends State<HoverableChannelCard> {
           _ytController?.playVideo();
         }
       } else {
-        if (widget.channel.url.isNotEmpty) {
-          final controller = VideoPlayerController.networkUrl(Uri.parse(widget.channel.url));
-          _videoController = controller;
-          controller.initialize().then((_) {
-            if (mounted && _isHovered) {
-              controller.setVolume(0.0);
-              controller.setLooping(true);
-              controller.play();
-              setState(() {
-                _isYt = false;
-                _isPlayingPreview = true;
-              });
-            } else {
-              controller.dispose();
+        if (playAsNativeYoutube) {
+          final regExp = RegExp(
+            r'^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*',
+            caseSensitive: false,
+          );
+          final match = regExp.firstMatch(widget.channel.url);
+          String? videoId;
+          if (match != null && match.groupCount >= 2) {
+            final id = match.group(2);
+            if (id != null && id.length == 11) {
+              videoId = id;
             }
-          }).catchError((_) {
-            // Ignore init errors for card preview
-          });
+          }
+          if (videoId != null) {
+            if (!mounted || !_isHovered) return;
+            _initializeYoutubePreviewCardWindows(videoId);
+          }
+        } else {
+          if (widget.channel.url.isNotEmpty) {
+            final controller = VideoPlayerController.networkUrl(Uri.parse(widget.channel.url));
+            controller.initialize().then((_) {
+              if (mounted && _isHovered) {
+                _videoController?.dispose();
+                _videoController = controller;
+                controller.setVolume(0.0);
+                controller.setLooping(true);
+                controller.play();
+                setState(() {
+                  _isYt = false;
+                  _isPlayingPreview = true;
+                });
+              } else {
+                controller.dispose();
+              }
+            }).catchError((_) {
+              // Ignore init errors for card preview
+            });
+          }
         }
       }
     });
+  }
+
+  Future<void> _initializeYoutubePreviewCardWindows(String videoId) async {
+    try {
+      final yt = yt_explode.YoutubeExplode();
+      final manifest = await yt.videos.streamsClient.getManifest(videoId);
+      final streamInfo = manifest.muxed.withHighestBitrate();
+      final streamUrl = streamInfo.url.toString();
+      yt.close();
+
+      if (!mounted || !_isHovered) return;
+
+      final controller = VideoPlayerController.networkUrl(Uri.parse(streamUrl));
+      await controller.initialize();
+      if (mounted && _isHovered) {
+        _videoController?.dispose();
+        _videoController = controller;
+        controller.setVolume(0.0);
+        controller.setLooping(true);
+        controller.play();
+        setState(() {
+          _isYt = false;
+          _isPlayingPreview = true;
+        });
+      } else {
+        controller.dispose();
+      }
+    } catch (_) {}
   }
 
   void _pausePreview() {

@@ -1,11 +1,17 @@
 import 'dart:async';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:youtube_player_iframe/youtube_player_iframe.dart';
+import 'package:youtube_explode_dart/youtube_explode_dart.dart' as yt_explode;
 import '../../../domain/entities/channel_entity.dart';
 import '../../../core/constants/app_colors.dart';
+import '../admin/providers/channel_admin_provider.dart';
+import '../admin/widgets/edit_channel_dialog.dart';
+import '../../../app/router/app_router.dart';
 import 'fullscreen_utils.dart';
 
 class PlayerScreen extends ConsumerStatefulWidget {
@@ -24,6 +30,7 @@ class PlayerScreen extends ConsumerStatefulWidget {
 
 class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   late ChannelEntity _currentChannel;
+  late List<ChannelEntity> _channelsList;
   VideoPlayerController? _controller;
   YoutubePlayerController? _ytController;
   bool _isYoutube = false;
@@ -53,6 +60,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   void initState() {
     super.initState();
     _currentChannel = widget.channel;
+    _channelsList = List.from(widget.channels);
     
     // Register global keyboard listener to capture keys before they get intercepted
     HardwareKeyboard.instance.addHandler(_handleGlobalKey);
@@ -103,7 +111,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       if (_isYoutube) {
         _ytController?.unMute();
       } else {
-        _controller?.setVolume(_volumePercent / 100.0);
+        _controller?.setVolume((_volumePercent / 100.0 * _currentChannel.volumeFactor).clamp(0.0, 1.0));
       }
     }
 
@@ -113,9 +121,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     });
 
     if (_isYoutube) {
-      _ytController?.setVolume(_volumePercent);
+      _ytController?.setVolume((_volumePercent * _currentChannel.volumeFactor).round().clamp(0, 100));
     } else {
-      _controller?.setVolume(_volumePercent / 100.0);
+      _controller?.setVolume((_volumePercent / 100.0 * _currentChannel.volumeFactor).clamp(0.0, 1.0));
     }
 
     _volumeHUDTimer?.cancel();
@@ -133,12 +141,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final nextIsYoutube = channel.streamType.toLowerCase() == 'youtube' ||
         channel.url.contains('youtube.com') ||
         channel.url.contains('youtu.be');
+    
+    final playAsNativeYoutube = nextIsYoutube && !kIsWeb && Platform.isWindows;
 
     setState(() {
       _currentChannel = channel;
       _hasError = false;
       _errorMessage = '';
-      _isYoutube = nextIsYoutube;
+      _isYoutube = nextIsYoutube && !playAsNativeYoutube;
       
       // Trigger Zap HUD overlay
       _showZapHUD = true;
@@ -155,23 +165,33 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     });
 
     if (nextIsYoutube) {
-      final videoId = _extractYoutubeId(channel.url);
-      if (videoId == null) {
-        setState(() {
-          _hasError = true;
-          _errorMessage = 'No se pudo extraer el ID del video de YouTube';
-        });
-        return;
-      }
+      if (playAsNativeYoutube) {
+        if (_ytController != null) {
+          _ytController!.close().catchError((e) {});
+          _ytController = null;
+        }
+        _controller?.dispose();
+        _controller = null;
+        _initializeYoutubePlayerWindows(channel.url);
+      } else {
+        final videoId = _extractYoutubeId(channel.url);
+        if (videoId == null) {
+          setState(() {
+            _hasError = true;
+            _errorMessage = 'No se pudo extraer el ID del video de YouTube';
+          });
+          return;
+        }
 
-      // Always recreate YouTube Controller when switching to guarantee autoplay on web
-      if (_ytController != null) {
-        _ytController!.close().catchError((e) {});
-        _ytController = null;
+        // Always recreate YouTube Controller when switching to guarantee autoplay on web
+        if (_ytController != null) {
+          _ytController!.close().catchError((e) {});
+          _ytController = null;
+        }
+        _controller?.dispose();
+        _controller = null;
+        _initializeYoutubePlayer(channel.url);
       }
-      _controller?.dispose();
-      _controller = null;
-      _initializeYoutubePlayer(channel.url);
     } else {
       // Clean up YouTube player if zapping to normal channel
       if (_ytController != null) {
@@ -187,14 +207,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         _preloadedControllers.remove(channel.id); // Active, remove from cache list
         
         if (_controller!.value.isInitialized) {
-          _controller!.setVolume(_isMuted ? 0.0 : _volumePercent / 100.0);
+          _controller!.setVolume(_isMuted ? 0.0 : (_volumePercent / 100.0 * channel.volumeFactor).clamp(0.0, 1.0));
           _controller!.play();
           setState(() {});
         } else {
           // If in the middle of initializing, wait and play
           _controller!.initialize().then((_) {
             if (mounted && _currentChannel.id == channel.id) {
-              _controller?.setVolume(_isMuted ? 0.0 : _volumePercent / 100.0);
+              _controller?.setVolume(_isMuted ? 0.0 : (_volumePercent / 100.0 * channel.volumeFactor).clamp(0.0, 1.0));
               _controller?.play();
               setState(() {});
             }
@@ -219,15 +239,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   }
 
   void _preloadAdjacentChannels() {
-    if (widget.channels.isEmpty) return;
-    final currentIndex = widget.channels.indexWhere((c) => c.id == _currentChannel.id);
+    if (_channelsList.isEmpty) return;
+    final currentIndex = _channelsList.indexWhere((c) => c.id == _currentChannel.id);
     if (currentIndex == -1) return;
 
-    final nextIndex = (currentIndex + 1) % widget.channels.length;
-    final prevIndex = (currentIndex - 1 + widget.channels.length) % widget.channels.length;
+    final nextIndex = (currentIndex + 1) % _channelsList.length;
+    final prevIndex = (currentIndex - 1 + _channelsList.length) % _channelsList.length;
 
-    final nextChannel = widget.channels[nextIndex];
-    final prevChannel = widget.channels[prevIndex];
+    final nextChannel = _channelsList[nextIndex];
+    final prevChannel = _channelsList[prevIndex];
 
     // Clean up cached controllers that are no longer adjacent
     final activeIds = {nextChannel.id, prevChannel.id};
@@ -301,6 +321,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         mute: true, // Start muted to ensure autoplay works on modern browsers
         enableKeyboard: false,
         pointerEvents: PointerEvents.none,
+        origin: 'https://www.youtube-nocookie.com',
       ),
     );
 
@@ -315,7 +336,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       // If we are not muted, make sure YouTube player is unmuted once it starts playing
       if (value.playerState == PlayerState.playing && !_isMuted) {
         _ytController?.unMute();
-        _ytController?.setVolume(_volumePercent);
+        _ytController?.setVolume((_volumePercent * _currentChannel.volumeFactor).round().clamp(0, 100));
       }
     });
     
@@ -325,16 +346,51 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     setState(() {});
   }
 
+  Future<void> _initializeYoutubePlayerWindows(String url) async {
+    final videoId = _extractYoutubeId(url);
+    if (videoId == null) {
+      setState(() {
+        _hasError = true;
+        _errorMessage = 'No se pudo extraer el ID del video de YouTube';
+      });
+      return;
+    }
+
+    try {
+      final yt = yt_explode.YoutubeExplode();
+      final manifest = await yt.videos.streamsClient.getManifest(videoId);
+      // Filter for highest quality muxed stream (video + audio)
+      final streamInfo = manifest.muxed.withHighestBitrate();
+      final streamUrl = streamInfo.url.toString();
+      yt.close();
+
+      _controller = VideoPlayerController.networkUrl(Uri.parse(streamUrl));
+      await _controller!.initialize();
+      if (mounted && _currentChannel.url == url) {
+        _controller!.setVolume(_isMuted ? 0.0 : (_volumePercent / 100.0 * _currentChannel.volumeFactor).clamp(0.0, 1.0));
+        _controller!.play();
+        setState(() {});
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _hasError = true;
+          _errorMessage = 'Error al extraer streaming de YouTube: $e';
+        });
+      }
+    }
+  }
+
   void _unmute() {
     _focusNode.requestFocus();
     if (_isYoutube) {
       if (_ytController != null) {
         _ytController!.unMute();
-        _ytController!.setVolume(_volumePercent);
+        _ytController!.setVolume((_volumePercent * _currentChannel.volumeFactor).round().clamp(0, 100));
         _ytController!.playVideo();
       }
     } else {
-      _controller?.setVolume(_volumePercent / 100.0);
+      _controller?.setVolume((_volumePercent / 100.0 * _currentChannel.volumeFactor).clamp(0.0, 1.0));
     }
     setState(() {
       _isMuted = false;
@@ -351,7 +407,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     _controller = VideoPlayerController.networkUrl(uri)
       ..initialize().then((_) {
         if (mounted) {
-          _controller?.setVolume(_isMuted ? 0.0 : _volumePercent / 100.0); // Respect mute state
+          _controller?.setVolume(_isMuted ? 0.0 : (_volumePercent / 100.0 * _currentChannel.volumeFactor).clamp(0.0, 1.0)); // Respect mute state
           setState(() {});
           _controller?.play(); // Autoplay
         }
@@ -366,19 +422,169 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   }
 
   void _nextChannel() {
-    if (widget.channels.isEmpty) return;
-    final currentIndex = widget.channels.indexWhere((c) => c.id == _currentChannel.id);
+    if (_channelsList.isEmpty) return;
+    final currentIndex = _channelsList.indexWhere((c) => c.id == _currentChannel.id);
     if (currentIndex == -1) return;
-    final nextIndex = (currentIndex + 1) % widget.channels.length;
-    _loadChannel(widget.channels[nextIndex]);
+    final nextIndex = (currentIndex + 1) % _channelsList.length;
+    _loadChannel(_channelsList[nextIndex]);
   }
 
   void _previousChannel() {
-    if (widget.channels.isEmpty) return;
-    final currentIndex = widget.channels.indexWhere((c) => c.id == _currentChannel.id);
+    if (_channelsList.isEmpty) return;
+    final currentIndex = _channelsList.indexWhere((c) => c.id == _currentChannel.id);
     if (currentIndex == -1) return;
-    final prevIndex = (currentIndex - 1 + widget.channels.length) % widget.channels.length;
-    _loadChannel(widget.channels[prevIndex]);
+    final prevIndex = (currentIndex - 1 + _channelsList.length) % _channelsList.length;
+    _loadChannel(_channelsList[prevIndex]);
+  }
+
+  void _confirmDeleteChannel(BuildContext context) {
+    // Temporarily exit fullscreen if active to show dialog properly
+    final wasFullscreen = _isFullscreen;
+    if (wasFullscreen) {
+      exitFullScreen();
+      setState(() => _isFullscreen = false);
+    }
+
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          backgroundColor: AppColors.panel,
+          title: Row(
+            children: [
+              const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 28),
+              const SizedBox(width: 12),
+              const Text('¿Eliminar Canal?', style: TextStyle(color: Colors.white)),
+            ],
+          ),
+          content: Text(
+            '¿Estás seguro de que deseas eliminar permanentemente el canal "${_currentChannel.name}"? Esta acción no se puede deshacer.',
+            style: const TextStyle(color: AppColors.textSecondary),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                // Restore fullscreen if cancelled
+                if (wasFullscreen) {
+                  enterFullScreen();
+                  setState(() => _isFullscreen = true);
+                }
+              },
+              child: const Text('Cancelar', style: TextStyle(color: AppColors.textSecondary)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+              onPressed: () async {
+                Navigator.of(dialogContext).pop(); // Close dialog
+                
+                final channelToDelete = _currentChannel;
+                
+                // Determine if we need to exit or switch channel
+                final remainingChannels = _channelsList.where((c) => c.id != channelToDelete.id).toList();
+                final shouldExit = remainingChannels.isEmpty;
+                
+                if (!shouldExit) {
+                  // Switch to next channel before deleting to ensure seamless viewing
+                  final currentIndex = _channelsList.indexWhere((c) => c.id == channelToDelete.id);
+                  if (currentIndex != -1) {
+                    final nextIndex = (currentIndex + 1) % _channelsList.length;
+                    var targetChannel = _channelsList[nextIndex];
+                    if (targetChannel.id == channelToDelete.id) {
+                      targetChannel = remainingChannels.first;
+                    }
+                    _loadChannel(targetChannel);
+                  } else {
+                    _loadChannel(remainingChannels.first);
+                  }
+                }
+                
+                try {
+                  // Show loading indicator
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Eliminando canal "${channelToDelete.name}"...'),
+                        backgroundColor: Colors.blueAccent,
+                      ),
+                    );
+                  }
+
+                  // Delete the channel
+                  await ref.read(channelAdminControllerProvider.notifier).deleteChannel(channelToDelete.id);
+                  
+                  // Update local copy of channels list on success
+                  _channelsList.removeWhere((c) => c.id == channelToDelete.id);
+                  
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Canal "${channelToDelete.name}" eliminado correctamente.'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                    
+                    if (shouldExit) {
+                      Navigator.of(context).pop(); // Exit player screen if no channels left
+                    } else {
+                      // Restore fullscreen if it was active
+                      if (wasFullscreen) {
+                        enterFullScreen();
+                        setState(() => _isFullscreen = true);
+                      }
+                    }
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error al eliminar canal: $e'),
+                        backgroundColor: Colors.redAccent,
+                      ),
+                    );
+                    // Restore fullscreen on error
+                    if (wasFullscreen) {
+                      enterFullScreen();
+                      setState(() => _isFullscreen = true);
+                    }
+                  }
+                }
+              },
+              child: const Text('Eliminar', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _editChannel(BuildContext context) async {
+    final wasFullscreen = _isFullscreen;
+    if (wasFullscreen) {
+      exitFullScreen();
+      setState(() => _isFullscreen = false);
+    }
+
+    final updatedChannel = await showDialog<ChannelEntity>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => EditChannelDialog(channel: _currentChannel),
+    );
+
+    if (updatedChannel != null) {
+      // Update local copy of channels list
+      final index = _channelsList.indexWhere((c) => c.id == updatedChannel.id);
+      if (index != -1) {
+        _channelsList[index] = updatedChannel;
+      }
+      _loadChannel(updatedChannel);
+    } else {
+      // Restore fullscreen if cancelled
+      if (wasFullscreen) {
+        enterFullScreen();
+        setState(() => _isFullscreen = true);
+      }
+    }
   }
 
   @override
@@ -557,6 +763,50 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                 onPressed: () => Navigator.of(context).pop(),
               ),
             ),
+            
+            // Edit Channel (Admin/SuperAdmin only option)
+            if (ref.watch(userRoleProvider) == 'admin' || ref.watch(userRoleProvider) == 'super_admin')
+              Positioned(
+                top: 16,
+                right: 210,
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.purple.withOpacity(0.5)),
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.edit, color: Colors.purpleAccent, size: 28),
+                      tooltip: 'Editar Canal',
+                      onPressed: () => _editChannel(context),
+                    ),
+                  ),
+                ),
+              ),
+
+            // Delete Channel (Admin/SuperAdmin only option)
+            if (ref.watch(userRoleProvider) == 'admin' || ref.watch(userRoleProvider) == 'super_admin')
+              Positioned(
+                top: 16,
+                right: 150,
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.red.withOpacity(0.5)),
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.delete_forever, color: Colors.redAccent, size: 28),
+                      tooltip: 'Eliminar Canal de la lista',
+                      onPressed: () => _confirmDeleteChannel(context),
+                    ),
+                  ),
+                ),
+              ),
             
             // Channel Watermark and Info
             Positioned(

@@ -41,23 +41,8 @@ class M3uParser {
             }
           }
           
-          // Determine category based on resolution
-          String category = 'General';
-          final combinedText = '$currentName $line'.toLowerCase();
-          
-          if (combinedText.contains('1080') || combinedText.contains('fhd') || combinedText.contains('1080p')) {
-            category = '1080p';
-          } else if (combinedText.contains('720') || combinedText.contains('720p') || combinedText.contains('hd')) {
-            category = '720p';
-          } else if (combinedText.contains('540') || combinedText.contains('540p')) {
-            category = '540p';
-          } else if (combinedText.contains('480') || combinedText.contains('480p') || combinedText.contains('sd')) {
-            category = '480p';
-          } else if (combinedText.contains('360') || combinedText.contains('360p')) {
-            category = '360p';
-          } else {
-            category = currentGroup ?? 'Otros';
-          }
+          // Determine category based on group-title or default to General
+          final category = (currentGroup != null && currentGroup.isNotEmpty) ? currentGroup : 'General';
 
           channels.add(ChannelEntity(
             id: uuid.v4(),

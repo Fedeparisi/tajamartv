@@ -24,6 +24,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     // Mock login logic
     if (_emailController.text == 'admin@youtvplay.com') {
       ref.read(userRoleProvider.notifier).state = 'admin';
+    } else if (_emailController.text == 'superadmin@youtvplay.com') {
+      ref.read(userRoleProvider.notifier).state = 'super_admin';
     } else {
       ref.read(userRoleProvider.notifier).state = 'client';
     }

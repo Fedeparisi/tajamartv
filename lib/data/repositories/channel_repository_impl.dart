@@ -41,6 +41,7 @@ class ChannelRepositoryImpl implements ChannelRepository {
       active: channel.active,
       order: channel.order,
       status: channel.status,
+      volumeFactor: channel.volumeFactor,
     );
     final map = model.toJson();
     map['id'] = id;
@@ -64,6 +65,7 @@ class ChannelRepositoryImpl implements ChannelRepository {
       active: channel.active,
       order: channel.order,
       status: channel.status,
+      volumeFactor: channel.volumeFactor,
     );
     final map = model.toJson();
     map['id'] = channel.id;

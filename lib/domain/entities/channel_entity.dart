@@ -15,6 +15,7 @@ class ChannelEntity extends Equatable {
   final bool active;
   final int order;
   final String status; // online, unstable, offline
+  final double volumeFactor; // volume leveling factor (0.5 to 1.5, default 1.0)
 
   const ChannelEntity({
     required this.id,
@@ -31,11 +32,13 @@ class ChannelEntity extends Equatable {
     this.active = true,
     this.order = 0,
     this.status = 'online',
+    this.volumeFactor = 1.0,
   });
 
   @override
   List<Object?> get props => [
         id, companyId, name, logo, categoryId, url, streamType,
         language, country, epgId, featured, active, order, status,
+        volumeFactor,
       ];
 }

@@ -19,6 +19,7 @@ class _EditChannelDialogState extends ConsumerState<EditChannelDialog> {
   late final TextEditingController _logoController;
   late String _categoryId;
   late String _streamType;
+  late double _volumeFactor;
   bool _isSaving = false;
   String _errorMessage = '';
 
@@ -30,6 +31,7 @@ class _EditChannelDialogState extends ConsumerState<EditChannelDialog> {
     _logoController = TextEditingController(text: widget.channel.logo);
     _categoryId = widget.channel.categoryId;
     _streamType = widget.channel.streamType;
+    _volumeFactor = widget.channel.volumeFactor;
   }
 
   @override
@@ -65,6 +67,7 @@ class _EditChannelDialogState extends ConsumerState<EditChannelDialog> {
           active: widget.channel.active,
           order: widget.channel.order,
           status: widget.channel.status,
+          volumeFactor: _volumeFactor,
         );
 
         await ref.read(channelAdminControllerProvider.notifier).updateChannel(updatedChannel);
@@ -76,7 +79,7 @@ class _EditChannelDialogState extends ConsumerState<EditChannelDialog> {
               backgroundColor: Colors.green,
             ),
           );
-          Navigator.of(context).pop();
+          Navigator.of(context).pop(updatedChannel);
         }
       } catch (e) {
         setState(() {
@@ -216,6 +219,36 @@ class _EditChannelDialogState extends ConsumerState<EditChannelDialog> {
                   onChanged: (val) {
                     if (val != null) setState(() => _streamType = val);
                   },
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Nivelación de volumen (Ganancia)',
+                  style: TextStyle(color: Colors.grey, fontSize: 14),
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Slider(
+                        value: _volumeFactor,
+                        min: 0.5,
+                        max: 1.5,
+                        divisions: 10,
+                        activeColor: Colors.purple,
+                        inactiveColor: Colors.white24,
+                        onChanged: (val) {
+                          setState(() => _volumeFactor = val);
+                        },
+                      ),
+                    ),
+                    Container(
+                      width: 50,
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        '${(_volumeFactor * 100).round()}%',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
                 ),
                 if (_errorMessage.isNotEmpty) ...[
                   const SizedBox(height: 16),

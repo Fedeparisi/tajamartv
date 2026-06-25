@@ -16,6 +16,7 @@ class ChannelModel extends ChannelEntity {
     super.active = true,
     super.order = 0,
     super.status = 'online',
+    super.volumeFactor = 1.0,
   });
 
   factory ChannelModel.fromJson(Map<String, dynamic> json, String documentId) {
@@ -34,6 +35,7 @@ class ChannelModel extends ChannelEntity {
       active: json['active'] ?? true,
       order: json['order'] ?? 0,
       status: json['status'] ?? 'online',
+      volumeFactor: (json['volumeFactor'] as num?)?.toDouble() ?? 1.0,
     );
   }
 
@@ -52,6 +54,7 @@ class ChannelModel extends ChannelEntity {
       'active': active,
       'order': order,
       'status': status,
+      'volumeFactor': volumeFactor,
     };
   }
 }
