@@ -7,6 +7,8 @@ import '../../presentation/features/home/home_screen.dart';
 import '../../presentation/features/admin/admin_dashboard_screen.dart';
 import '../../presentation/features/profiles/profiles_screen.dart';
 import '../../presentation/features/multiview/multiview_screen.dart';
+import '../../presentation/features/settings/settings_screen.dart';
+import '../../presentation/features/settings/devices_screen.dart';
 
 final authStateProvider = StateProvider<bool>((ref) => false);
 final userRoleProvider = StateProvider<String>((ref) => 'client'); // client, admin, super_admin
@@ -58,6 +60,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/admin',
         name: 'admin',
         builder: (context, state) => const AdminDashboardScreen(),
+      ),
+      GoRoute(
+        path: '/settings',
+        name: 'settings',
+        builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: '/devices',
+        name: 'devices',
+        builder: (context, state) => const DevicesScreen(),
       ),
       GoRoute(
         path: '/multiview/:count',

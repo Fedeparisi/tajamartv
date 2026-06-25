@@ -5,8 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:fvp/fvp.dart' as fvp;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'firebase_options.dart';
 import 'app/app.dart';
+import 'app/theme/theme_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,9 +27,14 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
+  final sharedPreferences = await SharedPreferences.getInstance();
+
   runApp(
-    const ProviderScope(
-      child: YouTVPlayApp(),
+    ProviderScope(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(sharedPreferences),
+      ],
+      child: const YouTVPlayApp(),
     ),
   );
 }
